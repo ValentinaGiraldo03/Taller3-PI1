@@ -3,10 +3,47 @@ from django.http import HttpResponse
 
 from .models import Movie
 
+from dotenv import load_dotenv, find_dotenv
 import matplotlib.pyplot as plt
 import matplotlib
 import io
 import urllib, base64
+import json
+from openai import OpenAI
+import numpy as np
+import os
+from openai import OpenAI
+
+_ = load_dotenv('openAI.env')
+client = OpenAI(api_key="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")
+
+with open('C:\\Users\\ASUS\\Desktop\\programacionVisual\\Taller3-PI1\\movie_descriptions_embeddings.json', 'r') as file:
+    file_content = file.read()
+    movie_embs = json.loads(file_content)
+
+#Esta función devuelve una representación numérica (embedding) de un texto, en este caso
+#la descripción de las películas
+    
+def get_embedding(text, model="text-embedding-3-small"):
+   text = text.replace("\n", " ")
+   return client.embeddings.create(input = [text], model=model).data[0].embedding
+
+def cosine_similarity(a, b):
+    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+
+def recommendations_view(request):
+    recommendTerm = request.GET.get('recommendMovie') # GET se usa para solicitar recursos de un servidor
+    if recommendTerm:
+        emb_req = get_embedding(recommendTerm)
+        sim = []
+        for i in range(len(movie_embs)):
+            sim.append(cosine_similarity(emb_req,movie_embs[i]['embedding']))
+        sim = np.array(sim)
+        idx = np.argmax(sim)
+        recommendMovie = Movie.objects.filter(title__icontains=movie_embs[idx]['title'])
+    else:
+        recommendMovie = Movie.objects.all()
+    return render(request, 'recommendations.html', {'recommendTerm':recommendTerm, 'recommendMovie':recommendMovie})
 
 def home(request):
     #return HttpResponse('<h1>Welcome to Home Page</h1>')
@@ -122,4 +159,18 @@ def generate_bar_chart(data, xlabel, ylabel):
     image_png = buffer.getvalue()
     buffer.close()
     graphic = base64.b64encode(image_png).decode('utf-8')
-    return graphic
+    return graphic  
+
+def recommendations_view(request):
+    recommendTerm = request.GET.get('recommendMovie') # GET se usa para solicitar recursos de un servidor
+    if recommendTerm:
+        emb_req = get_embedding(recommendTerm)
+        sim = []
+        for i in range(len(movie_embs)):
+            sim.append(cosine_similarity(emb_req,movie_embs[i]['embedding']))
+        sim = np.array(sim)
+        idx = np.argmax(sim)
+        recommendMovie = Movie.objects.filter(title__icontains=movie_embs[idx]['title'])
+    else:
+        recommendMovie = Movie.objects.all()
+    return render(request, 'recommendations.html', {'recommendTerm':recommendTerm, 'recommendMovie':recommendMovie})
